@@ -126,11 +126,7 @@ def get_audio_bytes(speaker: str, text: str) -> bytes:
     return synthesize_speech(text=text, speaker=speaker)
 
 
-def load_runtime(force_rebuild: bool = False) -> RuntimeBundle:
-    if force_rebuild:
-        runtime = build_runtime(force_rebuild=True)
-        get_cached_runtime.clear()
-        return runtime
+def load_runtime() -> RuntimeBundle:
     return get_cached_runtime()
 
 
@@ -329,13 +325,13 @@ def main() -> None:
         rounds = st.slider("Debate rounds", min_value=2, max_value=6, value=3, disabled=debate_running)
         top_k = st.slider("Evidence chunks per turn", min_value=2, max_value=5, value=3, disabled=debate_running)
         st.caption("For Groq free tier, 3 rounds and 2 to 3 evidence chunks are the safest defaults.")
-        rebuild_indexes = st.button("Rebuild knowledge bases", disabled=debate_running)
+        st.caption("Knowledge bases are loaded from the prebuilt storage cache and repaired automatically only if a cached index is unusable.")
         if not VOICE_ENABLED:
             st.info("Voice playback is disabled in this environment because 'edge-tts' is not installed yet.")
 
     try:
         with st.spinner("Loading corpuses and indexes..."):
-            runtime = load_runtime(force_rebuild=rebuild_indexes)
+            runtime = load_runtime()
     except Exception as exc:
         st.error(str(exc))
         st.stop()

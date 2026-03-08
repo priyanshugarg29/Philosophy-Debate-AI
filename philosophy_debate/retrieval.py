@@ -1,9 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import shutil
 import sys
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version
 
 if sys.version_info >= (3, 14):
     raise RuntimeError(
@@ -23,8 +24,26 @@ from philosophy_debate.llm import LocalEmbeddingService
 from philosophy_debate.models import IndexBuildReport, SearchResult, TextChunk
 
 
+INDEX_SCHEMA_VERSION = 2
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _package_version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _runtime_versions() -> dict[str, str]:
+    return {
+        "chromadb": _package_version("chromadb"),
+        "langchain-chroma": _package_version("langchain-chroma"),
+        "sentence-transformers": _package_version("sentence-transformers"),
+    }
 
 
 def _chunk_text(text: str, chunk_chars: int = 1400, overlap_chars: int = 250) -> list[str]:
@@ -84,7 +103,15 @@ class CorpusKnowledgeBase:
             with manifest_path.open("r", encoding="utf-8") as handle:
                 manifest = json.load(handle)
             if cls._is_manifest_fresh(corpus, manifest, embedder):
-                return cls._load(corpus, embedder, manifest)
+                try:
+                    knowledge_base = cls._load(corpus, embedder, manifest)
+                    knowledge_base._validate_cache()
+                    return knowledge_base
+                except Exception as exc:
+                    warning = f"Cached index was unusable for {corpus.display_name}; rebuilding automatically. Reason: {exc}"
+                    warnings = list(manifest.get("warnings", []))
+                    warnings.append(warning)
+                    return cls._build(corpus, embedder, extractor, inherited_warnings=warnings)
 
         return cls._build(corpus, embedder, extractor)
 
@@ -116,6 +143,8 @@ class CorpusKnowledgeBase:
         return (
             manifest.get("files") == cls._current_file_signature(corpus)
             and manifest.get("embedding_model") == embedder.model_name
+            and int(manifest.get("index_schema_version", 0)) == INDEX_SCHEMA_VERSION
+            and manifest.get("runtime_versions") == _runtime_versions()
         )
 
     @classmethod
@@ -148,6 +177,8 @@ class CorpusKnowledgeBase:
         corpus: CorpusSpec,
         embedder: LocalEmbeddingService,
         extractor: PDFTextExtractor,
+        *,
+        inherited_warnings: list[str] | None = None,
     ) -> "CorpusKnowledgeBase":
         pdf_files = list_pdf_files(corpus.corpus_dir)
         if not pdf_files:
@@ -155,7 +186,7 @@ class CorpusKnowledgeBase:
 
         corpus.storage_dir.mkdir(parents=True, exist_ok=True)
 
-        warnings: list[str] = []
+        warnings: list[str] = list(inherited_warnings or [])
         documents: list[Document] = []
         document_ids: list[str] = []
         used_ocr = False
@@ -202,6 +233,8 @@ class CorpusKnowledgeBase:
             "corpus_key": corpus.key,
             "display_name": corpus.display_name,
             "embedding_model": embedder.model_name,
+            "index_schema_version": INDEX_SCHEMA_VERSION,
+            "runtime_versions": _runtime_versions(),
             "built_at": _utc_now(),
             "source_count": len(pdf_files),
             "chunk_count": chunk_count,
@@ -225,12 +258,14 @@ class CorpusKnowledgeBase:
         )
         return cls(corpus=corpus, embedder=embedder, vectorstore=vectorstore, report=report)
 
+    def _validate_cache(self) -> None:
+        self.vectorstore.similarity_search(query="virtue", k=1)
+
     def search(self, query: str, top_k: int = 4) -> list[SearchResult]:
         results = self.vectorstore.similarity_search_with_score(query=query, k=top_k)
         search_results: list[SearchResult] = []
         for document, distance in results:
-            metadata = document.metadata
-            score = 1.0 / (1.0 + float(distance))
+            metadata = document.metadata or {}
             search_results.append(
                 SearchResult(
                     chunk=TextChunk(
@@ -239,9 +274,9 @@ class CorpusKnowledgeBase:
                         title=str(metadata.get("title", "Unknown Source")),
                         file_path=str(metadata.get("file_path", "")),
                         text=document.page_content,
-                        chunk_index=int(metadata.get("chunk_index", 0)),
+                        chunk_index=int(metadata.get("chunk_index", 0) or 0),
                     ),
-                    score=score,
+                    score=1.0 / (1.0 + float(distance)),
                 )
             )
         return search_results
