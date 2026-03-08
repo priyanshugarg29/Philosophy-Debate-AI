@@ -1,0 +1,37 @@
+{
+  "corpus_key": "machiavellian",
+  "display_name": "Machiavellianism Corpus",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "built_at": "2026-03-08T08:44:13.711645+00:00",
+  "source_count": 5,
+  "chunk_count": 2531,
+  "used_ocr": false,
+  "warnings": [],
+  "files": [
+    {
+      "path": "Machiavelli_The_Prince.pdf",
+      "size": 2860352,
+      "mtime": 1772957311
+    },
+    {
+      "path": "Machiavellianism The Psychology Of Manipulation.pdf",
+      "size": 6070357,
+      "mtime": 1772957455
+    },
+    {
+      "path": "machiavellianism-step-by-step-the-dark-psychology-behind-manipulation-amorality-ruthless-self-interest_compress.pdf",
+      "size": 2774707,
+      "mtime": 1772957745
+    },
+    {
+      "path": "Studies in Machiavellianism.pdf",
+      "size": 1677070,
+      "mtime": 1772957544
+    },
+    {
+      "path": "The48LawsOfPower.pdf",
+      "size": 31058156,
+      "mtime": 1772957823
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "corpus_key": "vedanta",
+  "display_name": "Vedanta Corpus",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "built_at": "2026-03-08T08:41:41.903142+00:00",
+  "source_count": 3,
+  "chunk_count": 2057,
+  "used_ocr": false,
+  "warnings": [],
+  "files": [
+    {
+      "path": "Brahma_Sutra.pdf",
+      "size": 2756647,
+      "mtime": 1769768105
+    },
+    {
+      "path": "The Bhagavad Gita.pdf",
+      "size": 5527227,
+      "mtime": 1769768015
+    },
+    {
+      "path": "The-Upanishads-Translated-by-Swami-Paramananda.pdf",
+      "size": 10045027,
+      "mtime": 1769767803
+    }
+  ]
+}

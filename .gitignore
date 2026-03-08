@@ -1,8 +1,6 @@
-﻿__pycache__/
+__pycache__/
 .pytest_cache/
 .venv/
 env/
 .env
 .streamlit/secrets.toml
-storage/*
-!storage/.gitkeep

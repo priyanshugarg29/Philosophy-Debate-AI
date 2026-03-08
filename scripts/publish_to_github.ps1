@@ -73,7 +73,7 @@ $trackedPaths = @(
     "Stoicism Corpus",
     "Vedanta corpus",
     "Machiavellianism Corpus",
-    "storage/.gitkeep"
+    "storage"
 )
 
 if (-not (Test-Path ".git")) {

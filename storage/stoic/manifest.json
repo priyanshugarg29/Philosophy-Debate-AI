@@ -1,0 +1,37 @@
+{
+  "corpus_key": "stoic",
+  "display_name": "Stoicism Corpus",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "built_at": "2026-03-08T08:38:55.010941+00:00",
+  "source_count": 5,
+  "chunk_count": 2394,
+  "used_ocr": false,
+  "warnings": [],
+  "files": [
+    {
+      "path": "epictetus_discourse.pdf",
+      "size": 477075,
+      "mtime": 1769767218
+    },
+    {
+      "path": "epictetus_enchiridon.pdf",
+      "size": 318306,
+      "mtime": 1769767305
+    },
+    {
+      "path": "Marcus-Aurelius-Meditations.pdf",
+      "size": 1986376,
+      "mtime": 1769770753
+    },
+    {
+      "path": "Seneca-Letters.pdf",
+      "size": 3514014,
+      "mtime": 1769771769
+    },
+    {
+      "path": "Stoic-Week-2015-Handbook-Stoicism-Today.pdf",
+      "size": 844789,
+      "mtime": 1769767534
+    }
+  ]
+}
