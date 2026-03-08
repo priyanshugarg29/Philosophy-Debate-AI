@@ -1,0 +1,16 @@
+﻿Philosophy Debate AI
+Author: Priyanshu Garg
+
+Quick run:
+1. Open PowerShell in this project folder.
+2. Activate the virtual environment:
+   .\.venv\Scripts\Activate.ps1
+3. Run the app:
+   py -m streamlit run app.py
+
+If you change the corpus files, rebuild indexes first:
+   py scripts\build_indexes.py --rebuild
+
+Detailed setup:
+- README.md
+- WINDOWS_SETUP.md
