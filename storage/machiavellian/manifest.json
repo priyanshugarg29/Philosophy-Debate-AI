@@ -2,9 +2,9 @@
   "corpus_key": "machiavellian",
   "display_name": "Machiavellianism Corpus",
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-  "built_at": "2026-03-08T08:44:13.711645+00:00",
-  "source_count": 5,
-  "chunk_count": 2531,
+  "built_at": "2026-03-08T13:23:48.434555+00:00",
+  "source_count": 6,
+  "chunk_count": 3763,
   "used_ocr": false,
   "warnings": [],
   "files": [
@@ -30,6 +30,11 @@
     },
     {
       "path": "The48LawsOfPower.pdf",
+      "size": 19265356,
+      "mtime": 1772971602
+    },
+    {
+      "path": "The48LawsOfPowerBKP.pdf",
       "size": 31058156,
       "mtime": 1772957823
     }
