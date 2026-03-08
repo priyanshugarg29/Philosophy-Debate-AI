@@ -8,7 +8,7 @@
     "langchain-chroma": "1.1.0",
     "sentence-transformers": "5.2.3"
   },
-  "built_at": "2026-03-08T13:39:11.774938+00:00",
+  "built_at": "2026-03-08T13:54:51.819520+00:00",
   "source_count": 6,
   "chunk_count": 3763,
   "used_ocr": false,

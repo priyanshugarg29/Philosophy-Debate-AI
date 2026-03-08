@@ -1,10 +1,13 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 if sys.version_info >= (3, 14):
     raise RuntimeError(
@@ -96,24 +99,50 @@ class CorpusKnowledgeBase:
         *,
         force_rebuild: bool = False,
     ) -> "CorpusKnowledgeBase":
-        manifest_path = corpus.storage_dir / "manifest.json"
-        chroma_dir = corpus.storage_dir / "chroma"
+        source_storage_dir = corpus.storage_dir
+        source_manifest_path = source_storage_dir / "manifest.json"
+        source_chroma_dir = source_storage_dir / "chroma"
+        source_writable = cls._is_storage_writable(source_storage_dir)
 
-        if not force_rebuild and manifest_path.exists() and chroma_dir.exists():
-            with manifest_path.open("r", encoding="utf-8") as handle:
-                manifest = json.load(handle)
+        if not force_rebuild and source_manifest_path.exists() and source_chroma_dir.exists():
+            manifest = cls._read_manifest(source_manifest_path)
             if cls._is_manifest_fresh(corpus, manifest, embedder):
+                load_storage_dir = source_storage_dir
+                if not source_writable:
+                    load_storage_dir = cls._prepare_runtime_storage(corpus, source_storage_dir, manifest)
+
                 try:
-                    knowledge_base = cls._load(corpus, embedder, manifest)
+                    knowledge_base = cls._load(corpus, embedder, manifest, load_storage_dir)
                     knowledge_base._validate_cache()
                     return knowledge_base
                 except Exception as exc:
-                    warning = f"Cached index was unusable for {corpus.display_name}; rebuilding automatically. Reason: {exc}"
+                    warning = (
+                        f"Cached index was unusable for {corpus.display_name}; rebuilding automatically. Reason: {exc}"
+                    )
                     warnings = list(manifest.get("warnings", []))
                     warnings.append(warning)
-                    return cls._build(corpus, embedder, extractor, inherited_warnings=warnings)
+                    rebuild_storage_dir = source_storage_dir if source_writable else cls._runtime_storage_dir(corpus)
+                    return cls._build(
+                        corpus,
+                        embedder,
+                        extractor,
+                        storage_dir=rebuild_storage_dir,
+                        inherited_warnings=warnings,
+                    )
 
-        return cls._build(corpus, embedder, extractor)
+        inherited_warnings: list[str] = []
+        if not source_writable:
+            inherited_warnings.append(
+                "Source storage is read-only in this environment; indexes will be built into a writable runtime directory."
+            )
+        build_storage_dir = source_storage_dir if source_writable else cls._runtime_storage_dir(corpus)
+        return cls._build(
+            corpus,
+            embedder,
+            extractor,
+            storage_dir=build_storage_dir,
+            inherited_warnings=inherited_warnings,
+        )
 
     @staticmethod
     def _collection_name(corpus: CorpusSpec) -> str:
@@ -132,6 +161,58 @@ class CorpusKnowledgeBase:
                 }
             )
         return signature
+
+    @staticmethod
+    def _read_manifest(manifest_path: Path) -> dict[str, object]:
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    @staticmethod
+    def _runtime_storage_root() -> Path:
+        override = os.getenv("PHILOSOPHY_DEBATE_RUNTIME_DIR")
+        if override:
+            return Path(override)
+        return Path(tempfile.gettempdir()) / "philosophy_debate_runtime"
+
+    @classmethod
+    def _runtime_storage_dir(cls, corpus: CorpusSpec) -> Path:
+        return cls._runtime_storage_root() / corpus.key
+
+    @staticmethod
+    def _is_storage_writable(storage_dir: Path) -> bool:
+        try:
+            storage_dir.mkdir(parents=True, exist_ok=True)
+            probe_path = storage_dir / ".write_probe"
+            probe_path.write_text("ok", encoding="utf-8")
+            probe_path.unlink(missing_ok=True)
+            return True
+        except OSError:
+            return False
+
+    @classmethod
+    def _prepare_runtime_storage(
+        cls,
+        corpus: CorpusSpec,
+        source_storage_dir: Path,
+        source_manifest: dict[str, object],
+    ) -> Path:
+        runtime_storage_dir = cls._runtime_storage_dir(corpus)
+        runtime_manifest_path = runtime_storage_dir / "manifest.json"
+        runtime_chroma_dir = runtime_storage_dir / "chroma"
+
+        if runtime_manifest_path.exists() and runtime_chroma_dir.exists():
+            try:
+                runtime_manifest = cls._read_manifest(runtime_manifest_path)
+                if runtime_manifest == source_manifest:
+                    return runtime_storage_dir
+            except Exception:
+                pass
+
+        if runtime_storage_dir.exists():
+            shutil.rmtree(runtime_storage_dir)
+        runtime_storage_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_storage_dir, runtime_storage_dir)
+        return runtime_storage_dir
 
     @classmethod
     def _is_manifest_fresh(
@@ -153,10 +234,11 @@ class CorpusKnowledgeBase:
         corpus: CorpusSpec,
         embedder: LocalEmbeddingService,
         manifest: dict[str, object],
+        storage_dir: Path,
     ) -> "CorpusKnowledgeBase":
         vectorstore = Chroma(
             collection_name=cls._collection_name(corpus),
-            persist_directory=str(corpus.storage_dir / "chroma"),
+            persist_directory=str(storage_dir / "chroma"),
             embedding_function=embedder.embedding_model,
         )
         report = IndexBuildReport(
@@ -178,13 +260,14 @@ class CorpusKnowledgeBase:
         embedder: LocalEmbeddingService,
         extractor: PDFTextExtractor,
         *,
+        storage_dir: Path,
         inherited_warnings: list[str] | None = None,
     ) -> "CorpusKnowledgeBase":
         pdf_files = list_pdf_files(corpus.corpus_dir)
         if not pdf_files:
             raise FileNotFoundError(f"No PDF files were found in {corpus.corpus_dir}.")
 
-        corpus.storage_dir.mkdir(parents=True, exist_ok=True)
+        storage_dir.mkdir(parents=True, exist_ok=True)
 
         warnings: list[str] = list(inherited_warnings or [])
         documents: list[Document] = []
@@ -217,11 +300,10 @@ class CorpusKnowledgeBase:
         if not documents:
             raise RuntimeError(f"No searchable chunks were created for {corpus.display_name}.")
 
-        chroma_dir = corpus.storage_dir / "chroma"
+        chroma_dir = storage_dir / "chroma"
         if chroma_dir.exists():
             shutil.rmtree(chroma_dir)
 
-        # Chroma keeps each tradition in its own persisted vector index.
         vectorstore = Chroma(
             collection_name=cls._collection_name(corpus),
             persist_directory=str(chroma_dir),
@@ -243,7 +325,7 @@ class CorpusKnowledgeBase:
             "files": cls._current_file_signature(corpus),
         }
 
-        with (corpus.storage_dir / "manifest.json").open("w", encoding="utf-8") as handle:
+        with (storage_dir / "manifest.json").open("w", encoding="utf-8") as handle:
             json.dump(manifest, handle, indent=2)
 
         report = IndexBuildReport(
